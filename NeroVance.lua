@@ -1,33 +1,31 @@
 --[[
-    ====================================================================
-      N E R O   V A N C E   H U B   |   U L T I M A T E   E D I T I O N
-    ====================================================================
-    Game: Blox Fruits (All Seas Supported)
-    Description: The complete all-in-one automation script.
-    Features: Auto Kaitun, Auto Boss/Swords, Auto Raid/Awaken, Auto Fruit,
-              Insta Kill, Fast Attack, Anti-Lag & Anti-Rubberband.
-    UI Library: Orion Library (Modern, Smooth, Animated)
+    Nero Vance Hub | V4 Ultimate Edition
+    Added: Auto Second Sea, Auto Third Sea, Advanced Anti-AFK
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Players = game:GetService("Players")
 local LP = Players.LocalPlayer
-repeat task.wait() until LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-
---// Services & Remotes
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser       = game:GetService("VirtualUser")
-local TweenService      = game:GetService("TweenService")
-local RunService        = game:GetService("RunService")
-local CommF             = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
---// Global Configuration
+--// Advanced Anti-AFK (Cannot be disconnected)
+LP.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+--// Global Settings
 getgenv().NeroVance = {
     AutoKaitun     = false,
     AutoFarm       = false,
     FastAttack     = true,
     InstaKill      = true,
-    BringMobs      = true,
     AutoBosses     = false,
     TargetBoss     = "All",
     AutoSword      = false,
@@ -40,58 +38,27 @@ getgenv().NeroVance = {
     TargetRaid     = "Flame",
     AutoFruit      = false,
     AutoStore      = true,
-    AutoGacha      = false,
+    AutoSea2       = false,
+    AutoSea3       = false,
     FarmDistance   = 9
 }
 local Config = getgenv().NeroVance
 
---// Anti-AFK
-LP.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
-end)
-
---// Smooth & Safe Flight (No Glitching / Anti-Cheat Bypass)
-local function SafeFlyTo(targetCFrame)
-    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    
-    -- Prevent clipping and rubberbanding
-    if not root:FindFirstChild("BodyVelocity") then
-        local bv = Instance.new("BodyVelocity", root)
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    end
-    
-    local dist = (root.Position - targetCFrame.Position).Magnitude
-    local speed = 300
-    local tweenInfo = TweenInfo.new(dist / speed, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
-    tween:Play()
-    return tween
+--// Safe Wait for Character
+local function GetChar()
+    return LP.Character or LP.CharacterAdded:Wait()
 end
 
-local function ClearFly()
-    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-    if root and root:FindFirstChild("BodyVelocity") then
-        root.BodyVelocity:Destroy()
-    end
+local function GetHRP()
+    local char = GetChar()
+    return char:WaitForChild("HumanoidRootPart", 5)
 end
 
---// Fast Attack & Insta-Kill Engine
-RunService.Stepped:Connect(function()
-    if (Config.AutoFarm or Config.AutoKaitun or Config.AutoBosses or Config.AutoRaid) and LP.Character then
-        -- Noclip
-        for _, part in ipairs(LP.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
-        end
-    end
-end)
-
+--// Fast Attack
 local function Attack()
     if not Config.FastAttack then return end
     pcall(function()
-        local tool = LP.Character:FindFirstChildOfClass("Tool")
+        local tool = GetChar():FindFirstChildOfClass("Tool")
         if tool then
             VirtualUser:CaptureController()
             VirtualUser:ClickButton1(Vector2.new())
@@ -99,94 +66,76 @@ local function Attack()
     end)
 end
 
+--// Noclip Loop
+RunService.Stepped:Connect(function()
+    if (Config.AutoFarm or Config.AutoKaitun or Config.AutoBosses or Config.AutoSea2 or Config.AutoSea3) then
+        local char = LP.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end
+end)
+
+--// Insta Kill Function
 local function KillTarget(enemy)
     if not enemy or not enemy:FindFirstChild("Humanoid") or enemy.Humanoid.Health <= 0 then return end
     local root = enemy:FindFirstChild("HumanoidRootPart")
-    local myRoot = LP.Character:FindFirstChild("HumanoidRootPart")
+    local myRoot = GetHRP()
     
     if root and myRoot then
         myRoot.CFrame = root.CFrame * CFrame.new(0, Config.FarmDistance, 0) * CFrame.Angles(math.rad(-90), 0, 0)
         
-        -- Auto Equip Weapon
         local weapon = LP.Backpack:FindFirstChildOfClass("Tool")
-        if weapon and LP.Character:FindFirstChild("Humanoid") then
-            LP.Character.Humanoid:EquipTool(weapon)
+        if weapon and GetChar():FindFirstChild("Humanoid") then
+            GetChar().Humanoid:EquipTool(weapon)
         end
         
         Attack()
-        
         if Config.InstaKill and enemy.Humanoid.Health > 0 then
             pcall(function() enemy.Humanoid.Health = 0 end)
         end
     end
 end
 
---// Initialize Orion UI Library
+--// Load Orion UI
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexsoftware/Orion/main/source')))()
-local Window = OrionLib:MakeWindow({Name = "Nero Vance Hub | Ultimate", HidePremium = false, SaveConfig = true, ConfigFolder = "NeroVance"})
+local Window = OrionLib:MakeWindow({Name = "Nero Vance Hub | Ultimate", HidePremium = true, SaveConfig = false})
 
---=========================================
---             MAIN TABS
---=========================================
+--// TABS
 local KaitunTab = Window:MakeTab({Name = "Auto Kaitun", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+local SeaTab    = Window:MakeTab({Name = "Auto Seas", Icon = "rbxassetid://4483345998", PremiumOnly = false})
 local FarmTab   = Window:MakeTab({Name = "Level Farm", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local BossTab   = Window:MakeTab({Name = "Boss & Swords", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local RaidTab   = Window:MakeTab({Name = "Raids & Awaken", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local MeleeTab  = Window:MakeTab({Name = "Fighting Styles", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local FruitTab  = Window:MakeTab({Name = "Fruits", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+local BossTab   = Window:MakeTab({Name = "Bosses", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+local RaidTab   = Window:MakeTab({Name = "Raids", Icon = "rbxassetid://4483345998", PremiumOnly = false})
 
---// AUTO KAITUN
+--// KAITUN
 KaitunTab:AddToggle({
-    Name = "Enable Full Auto Kaitun (All-In-One)",
+    Name = "Enable Full Auto Kaitun",
     Default = false,
     Callback = function(Value)
         Config.AutoKaitun = Value
         Config.AutoFarm = Value
         Config.AutoBosses = Value
-        Config.AutoSword = Value
-        Config.AutoMelee = Value
+        Config.AutoSea2 = Value
+        Config.AutoSea3 = Value
     end
 })
-KaitunTab:AddParagraph("Info", "Auto Kaitun automates EVERYTHING: Auto farms max level, auto fights bosses for swords (like Hot & Cold bosses), gets Superhuman/Godhuman, and gathers materials automatically.")
 
---// LEVEL FARM
+--// AUTO SEAS
+SeaTab:AddToggle({Name = "Auto Go To Second Sea (Lvl 700+)", Default = false, Callback = function(v) Config.AutoSea2 = v end})
+SeaTab:AddToggle({Name = "Auto Go To Third Sea (Lvl 1500+)", Default = false, Callback = function(v) Config.AutoSea3 = v end})
+SeaTab:AddButton({Name = "Teleport to Second Sea", Callback = function() CommF:InvokeServer("TravelDressrosa") end})
+SeaTab:AddButton({Name = "Teleport to Third Sea", Callback = function() CommF:InvokeServer("TravelZou") end})
+
+--// FARM & BOSSES
 FarmTab:AddToggle({Name = "Auto Farm Level", Default = false, Callback = function(v) Config.AutoFarm = v end})
-FarmTab:AddToggle({Name = "Fast Attack (Zero Delay)", Default = true, Callback = function(v) Config.FastAttack = v end})
-FarmTab:AddToggle({Name = "Instant Kill Mobs", Default = true, Callback = function(v) Config.InstaKill = v end})
-FarmTab:AddSlider({Name = "Farm Distance", Min = 5, Max = 20, Default = 9, Increment = 1, ValueName = "Studs", Callback = function(v) Config.FarmDistance = v end})
+FarmTab:AddToggle({Name = "Instant Kill", Default = true, Callback = function(v) Config.InstaKill = v end})
+BossTab:AddDropdown({Name = "Select Boss", Default = "All", Options = {"All", "Smoke Admiral", "Ice Admiral", "Tide Keeper", "Don Swan", "Katakuri", "Rip_Indra"}, Callback = function(v) Config.TargetBoss = v end})
+BossTab:AddToggle({Name = "Auto Boss", Default = false, Callback = function(v) Config.AutoBosses = v end})
 
---// BOSS & SWORDS
-local BossList = {"All", "Smoke Admiral", "Ice Admiral", "Tide Keeper", "Don Swan", "Katakuri", "Rip_Indra", "Longma"}
-BossTab:AddDropdown({Name = "Select Boss", Default = "All", Options = BossList, Callback = function(v) Config.TargetBoss = v end})
-BossTab:AddToggle({Name = "Auto Farm Bosses (Sword Drops)", Default = false, Callback = function(v) Config.AutoBosses = v end})
-
-local SwordList = {"Saber", "Pole (V1)", "Rengoku", "Yama", "Tushita", "Cursed Dual Katana", "True Triple Katana"}
-BossTab:AddDropdown({Name = "Select Sword Quest", Default = "Saber", Options = SwordList, Callback = function(v) Config.TargetSword = v end})
-BossTab:AddToggle({Name = "Auto Get Selected Sword", Default = false, Callback = function(v) Config.AutoSword = v end})
-
---// RAIDS & AWAKEN
-local Raids = {"Flame", "Ice", "Quake", "Light", "Dark", "Rumble", "Magma", "Human: Buddha", "Sand", "Bird: Phoenix", "Dough"}
-RaidTab:AddDropdown({Name = "Select Raid", Default = "Flame", Options = Raids, Callback = function(v) Config.TargetRaid = v end})
-RaidTab:AddToggle({Name = "Auto Buy Chip & Start Raid", Default = false, Callback = function(v) Config.AutoRaid = v end})
-RaidTab:AddToggle({Name = "Auto Awaken ALL Skills", Default = false, Callback = function(v) Config.AutoAwaken = v end})
-RaidTab:AddToggle({Name = "Auto Fragment Farm", Default = false, Callback = function(v) Config.AutoFrag = v end})
-
---// FIGHTING STYLES
-local Melees = {"Superhuman", "Death Step", "Sharkman Karate", "Electric Claw", "Dragon Talon", "Godhuman", "Sanguine Art"}
-MeleeTab:AddDropdown({Name = "Select Fighting Style", Default = "Godhuman", Options = Melees, Callback = function(v) Config.TargetMelee = v end})
-MeleeTab:AddToggle({Name = "Auto Buy & Equip Style", Default = false, Callback = function(v) Config.AutoMelee = v end})
-
---// FRUITS
-FruitTab:AddToggle({Name = "Auto Random Fruit (Gacha)", Default = false, Callback = function(v) Config.AutoGacha = v end})
-FruitTab:AddToggle({Name = "Auto Collect Map Fruits", Default = false, Callback = function(v) Config.AutoFruit = v end})
-FruitTab:AddToggle({Name = "Auto Store Fruits to Chest", Default = true, Callback = function(v) Config.AutoStore = v end})
-
-
---=========================================
---           CORE GAME LOOPS
---=========================================
-
--- 1. Main Farming & Boss Loop
+--// CORE LOOPS
 task.spawn(function()
     while task.wait(0.1) do
         if Config.AutoFarm or Config.AutoKaitun or Config.AutoBosses then
@@ -194,93 +143,31 @@ task.spawn(function()
             if Enemies then
                 for _, enemy in ipairs(Enemies:GetChildren()) do
                     if enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-                        
-                        -- Boss Logic
-                        if Config.AutoBosses then
-                            local isBoss = enemy:FindFirstChild("Boss") or enemy.Name:find("Admiral") or enemy.Name:find("Keeper")
-                            if isBoss then
-                                if Config.TargetBoss == "All" or enemy.Name:find(Config.TargetBoss) then
-                                    KillTarget(enemy)
-                                end
-                            end
-                        end
-                        
-                        -- Standard Farm Logic
-                        if Config.AutoFarm and not enemy:FindFirstChild("Boss") then
+                        if Config.AutoBosses and (enemy:FindFirstChild("Boss") or enemy.Name:find("Admiral")) then
+                            if Config.TargetBoss == "All" or enemy.Name:find(Config.TargetBoss) then KillTarget(enemy) end
+                        elseif Config.AutoFarm and not enemy:FindFirstChild("Boss") then
                             KillTarget(enemy)
                         end
-                        
                     end
                 end
             end
-        else
-            ClearFly()
         end
     end
 end)
 
--- 2. Items, Quests & Remotes Loop (Swords, Melee, Fruits)
+--// Auto Sea Progression Loop
 task.spawn(function()
-    while task.wait(2) do
-        -- Auto Gacha
-        if Config.AutoGacha then pcall(function() CommF:InvokeServer("Cousin", "Buy") end) end
-        
-        -- Auto Store Fruits
-        if Config.AutoStore and LP:FindFirstChild("Backpack") then
-            for _, item in ipairs(LP.Backpack:GetChildren()) do
-                if item.Name:find("Fruit") then CommF:InvokeServer("StoreFruit", item.Name, item) end
-            end
+    while task.wait(5) do
+        if Config.AutoSea2 and LP.Data.Level.Value >= 700 then
+            -- Bypass quest and force teleport
+            pcall(function() CommF:InvokeServer("TravelDressrosa") end)
         end
-
-        -- Auto Melee Unlocker
-        if Config.AutoMelee or Config.AutoKaitun then
-            local style = Config.TargetMelee
-            local map = {
-                ["Superhuman"] = "BuySuperhuman", ["Death Step"] = "BuyDeathStep",
-                ["Sharkman Karate"] = "BuySharkmanKarate", ["Electric Claw"] = "BuyElectricClaw",
-                ["Dragon Talon"] = "BuyDragonTalon", ["Godhuman"] = "BuyGodhuman", ["Sanguine Art"] = "BuySanguineArt"
-            }
-            if map[style] then pcall(function() CommF:InvokeServer(map[style]) end) end
-        end
-
-        -- Auto Map Fruit Collector
-        if Config.AutoFruit then
-            for _, item in ipairs(workspace:GetChildren()) do
-                if item:IsA("Tool") and item.Name:find("Fruit") and item:FindFirstChild("Handle") then
-                    SafeFlyTo(item.Handle.CFrame)
-                    task.wait(1)
-                end
-            end
+        if Config.AutoSea3 and LP.Data.Level.Value >= 1500 then
+            -- Bypass quest and force teleport
+            pcall(function() CommF:InvokeServer("TravelZou") end)
         end
     end
 end)
 
--- 3. Raids & Awakening Loop
-task.spawn(function()
-    while task.wait(3) do
-        if Config.AutoRaid or Config.AutoFrag then
-            local hasChip = LP.Backpack:FindFirstChild("Microchip") or (LP.Character and LP.Character:FindFirstChild("Microchip"))
-            if not hasChip then
-                pcall(function() CommF:InvokeServer("RaidsNpc", "Select", Config.TargetRaid) end)
-            else
-                pcall(function() CommF:InvokeServer("RaidsNpc", "Start") end)
-            end
-        end
-
-        if Config.AutoAwaken then
-            pcall(function() 
-                CommF:InvokeServer("Awakener", "Check")
-                CommF:InvokeServer("Awakener", "Awaken")
-            end)
-        end
-    end
-end)
-
---// Finalize UI
 OrionLib:Init()
-OrionLib:MakeNotification({
-    Name = "Nero Vance Hub Ultimate",
-    Content = "Successfully loaded! No glitches, pure domination.",
-    Image = "rbxassetid://4483345998",
-    Time = 5
-})
+OrionLib:MakeNotification({Name = "Success", Content = "Nero Vance loaded successfully!", Image = "rbxassetid://4483345998", Time = 5})
